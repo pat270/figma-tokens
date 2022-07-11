@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useCallback } from 'react';
+import axios from 'axios';
 import Box from './Box';
 import { Tabs } from '@/constants/Tabs';
 import Stack from './Stack';
@@ -7,9 +8,26 @@ import { NavbarUndoButton } from './NavbarUndoButton';
 import Minimize from '../assets/minimize.svg';
 import useMinimizeWindow from './useMinimizeWindow';
 import IconButton from './IconButton';
+import { IconFolder } from '@/icons';
+import useTokens from '@/app/store/useTokens';
 
 const Navbar: React.FC = () => {
   const { handleResize } = useMinimizeWindow();
+  const { getFormattedTokens } = useTokens();
+  const handleOpenTokenFlowApp = useCallback(async () => {
+    const tokens = getFormattedTokens({
+      includeAllTokens: true, includeParent: false, expandTypography: false, expandShadow: false,
+    });
+    const data = JSON.stringify(tokens, null, 2);
+    const response = await axios({
+      method: 'post',
+      url: 'http://localhost:3000/api/tokens',
+      data: {
+        data,
+      },
+    });
+    if (response.status === 200) window.open(`http://localhost:3000?id=${response.data.result}`);
+  }, [getFormattedTokens]);
 
   return (
     <Box
@@ -33,6 +51,7 @@ const Navbar: React.FC = () => {
         </div>
         <NavbarUndoButton />
       </Stack>
+      <IconButton tooltip="open tokenflow app" onClick={handleOpenTokenFlowApp} icon={<IconFolder />} />
       <Stack direction="row" align="center">
         <IconButton tooltip="Minimize plugin" onClick={handleResize} icon={<Minimize />} />
       </Stack>
