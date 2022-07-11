@@ -284,19 +284,21 @@ export const tokenState = createModel<RootModel>()({
 
     renameTokenGroup: (state, data: RenameTokenGroupPayload) => {
       const {
-        path, oldName, newName, type,
+        parent, path, oldName, newName, type,
       } = data;
 
       const tokenSetsList = Object.keys(state.usedTokenSet);
       const newTokenGroupState = tokenSetsList.map((tokenSets) => {
         const newTokenGroups = state.tokens[tokenSets].map((token) => {
-          if (token.name.startsWith(`${path}${oldName}.`) && token.type === type) {
-            const { name, ...rest } = token;
-            const newTokenName = name.replace(`${path}${oldName}`, `${path}${newName}`);
-            return {
-              ...rest,
-              name: newTokenName,
-            };
+          if (tokenSets === parent) {
+            if (token.name.startsWith(`${path}${oldName}.`) && token.type === type) {
+              const { name, ...rest } = token;
+              const newTokenName = name.replace(`${path}${oldName}`, `${path}${newName}`);
+              return {
+                ...rest,
+                name: newTokenName,
+              };
+            }
           }
           if (token.value.toString().startsWith(`{${path}${oldName}.`)) {
             const { value, ...rest } = token;
