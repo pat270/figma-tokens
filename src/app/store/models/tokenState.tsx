@@ -15,7 +15,6 @@ import {
   DeleteTokenPayload,
   SetTokenDataPayload,
   SetTokensFromStylesPayload,
-  ToggleManyTokenSetsPayload,
   UpdateDocumentPayload,
   UpdateTokenPayload,
   RenameTokenGroupPayload,
@@ -29,6 +28,8 @@ import { TokenSetStatus } from '@/constants/TokenSetStatus';
 import { isEqual } from '@/utils/isEqual';
 import { StorageProviderType } from '@/constants/StorageProviderType';
 import { updateTokenSetsInState } from '@/utils/tokenset/updateTokenSetsInState';
+import { TokenTypes } from '@/constants/TokenTypes';
+import tokenTypes from '@/config/tokenType.defs.json';
 
 export interface TokenState {
   tokens: Record<string, AnyTokenList>;
@@ -43,6 +44,8 @@ export interface TokenState {
   usedTokenSet: UsedTokenSetsMap;
   editProhibited: boolean;
   hasUnsavedChanges: boolean;
+  collapsedTokenSets: string[];
+  collapsedTokenTypeObj: Record<TokenTypes, boolean>
 }
 
 export const tokenState = createModel<RootModel>()({
@@ -58,55 +61,22 @@ export const tokenState = createModel<RootModel>()({
     },
     activeTheme: null,
     activeTokenSet: 'global',
-    usedTokenSet: ['global'],
+    usedTokenSet: {
+      global: TokenSetStatus.ENABLED,
+    },
     editProhibited: false,
     hasUnsavedChanges: false,
+    collapsedTokenSets: [],
+    collapsedTokenTypeObj: Object.keys(tokenTypes).reduce<Partial<Record<TokenTypes, boolean>>>((acc, tokenType) => {
+      acc[tokenType as TokenTypes] = false;
+      return acc;
+    }, {}),
   } as unknown as TokenState,
   reducers: {
     setEditProhibited(state, payload: boolean) {
       return {
         ...state,
         editProhibited: payload,
-      };
-    },
-    toggleUsedTokenSet: (state, tokenSet: string) => ({
-      ...state,
-      activeTheme: null,
-      usedTokenSet: {
-        ...state.usedTokenSet,
-        // @README it was decided the user can not simply toggle to the intermediate SOURCE state
-        // this means for toggling we only switch between ENABLED and DISABLED
-        // setting as source is a separate action
-        [tokenSet]: state.usedTokenSet[tokenSet] === TokenSetStatus.DISABLED
-          ? TokenSetStatus.ENABLED
-          : TokenSetStatus.DISABLED,
-      },
-    }),
-    toggleManyTokenSets: (state, data: ToggleManyTokenSetsPayload) => {
-      const oldSetsWithoutInput = Object.fromEntries(
-        Object.entries(state.usedTokenSet)
-          .filter(([tokenSet]) => !data.sets.includes(tokenSet)),
-      );
-
-      if (data.shouldCheck) {
-        return {
-          ...state,
-          activeTheme: null,
-          usedTokenSet: {
-            ...oldSetsWithoutInput,
-            ...Object.fromEntries(data.sets.map((tokenSet) => ([tokenSet, TokenSetStatus.ENABLED]))),
-          },
-        };
-      }
-
-      return {
-        ...state,
-        activeTheme: null,
-        usedTokenSet: {
-          ...oldSetsWithoutInput,
-          ...Object.fromEntries(data.sets.map((tokenSet) => ([tokenSet, TokenSetStatus.DISABLED]))),
-          // @README see comment (1) - ensure that all token sets are always available
-        },
       };
     },
     toggleTreatAsSource: (state, tokenSet: string) => ({
@@ -137,7 +107,6 @@ export const tokenState = createModel<RootModel>()({
       }
 
       const newName = `${name}_Copy`;
-
       return updateTokenSetsInState(state, null, [newName, state.tokens[name]]);
     },
     deleteTokenSet: (state, name: string) => updateTokenSetsInState(
@@ -146,24 +115,6 @@ export const tokenState = createModel<RootModel>()({
         setName === name ? null : [setName, tokenSet]
       ),
     ),
-    renameTokenSet: (state, data: { oldName: string; newName: string }) => {
-      if (
-        Object.keys(state.tokens).includes(data.newName)
-        && data.oldName !== data.newName
-      ) {
-        notifyToUI('Token set already exists', { error: true });
-        return state;
-      }
-
-      return updateTokenSetsInState(
-        state,
-        (setName, tokenSet) => (
-          setName === data.oldName
-            ? [data.newName, tokenSet]
-            : [setName, tokenSet]
-        ),
-      );
-    },
     setLastSyncedState: (state, data: string) => ({
       ...state,
       lastSyncedState: data,
@@ -203,7 +154,7 @@ export const tokenState = createModel<RootModel>()({
         hasUnsavedChanges: payload,
       };
     },
-    setTokens: (state, newTokens) => ({
+    setTokens: (state, newTokens: Record<string, AnyTokenList>) => ({
       ...state,
       tokens: newTokens,
     }),
@@ -431,6 +382,14 @@ export const tokenState = createModel<RootModel>()({
         tokens: newTokens,
       };
     },
+    setCollapsedTokenSets: (state, data: string[]) => ({
+      ...state,
+      collapsedTokenSets: data,
+    }),
+    setCollapsedTokenTypeObj: (state, data: Record<TokenTypes, boolean>) => ({
+      ...state,
+      collapsedTokenTypeObj: data,
+    }),
     ...tokenStateReducers,
   },
   effects: (dispatch) => ({

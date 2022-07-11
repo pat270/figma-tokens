@@ -40,11 +40,11 @@ export function Initiator() {
   }, [confirm]);
 
   const onInitiate = useCallback(() => {
-    AsyncMessageChannel.message({ type: AsyncMessageTypes.INITIATE });
+    AsyncMessageChannel.ReactInstance.message({ type: AsyncMessageTypes.INITIATE });
   }, []);
 
   const getApiCredentials = useCallback((shouldPull: boolean, featureFlags: LDProps['flags'] | null) => (
-    AsyncMessageChannel.message({
+    AsyncMessageChannel.ReactInstance.message({
       type: AsyncMessageTypes.GET_API_CREDENTIALS,
       shouldPull,
       featureFlags,
@@ -66,7 +66,10 @@ export function Initiator() {
             dispatch.uiState.setSelectedLayers(selectedNodes);
             dispatch.uiState.setDisabled(false);
             if (mainNodeSelectionValues.length > 1) {
-              dispatch.uiState.setMainNodeSelectionValues({});
+              const selectionValues = mainNodeSelectionValues.reduce((acc, crr) => (
+                Object.assign(acc, crr)
+              ), {});
+              dispatch.uiState.setMainNodeSelectionValues(selectionValues);
             } else if (mainNodeSelectionValues.length > 0) {
               // When only one node is selected, we can set the state
               dispatch.uiState.setMainNodeSelectionValues(mainNodeSelectionValues[0]);
@@ -161,13 +164,15 @@ export function Initiator() {
 
                   dispatch.uiState.setApiData(credentials);
                   dispatch.uiState.setLocalApiState(credentials);
+                  dispatch.tokenState.setActiveTheme(activeTheme || null); // @TODO look into this
 
                   if (shouldPull) {
                     const remoteData = await pullTokens({
                       context: credentials, featureFlags: receivedFlags, usedTokenSet, activeTheme,
                     });
                     const existTokens = Object.values(remoteData?.tokens ?? {}).some((value) => value.length > 0);
-                    if (existTokens) { dispatch.uiState.setActiveTab(Tabs.TOKENS); } else { dispatch.uiState.setActiveTab(Tabs.START); }
+                    if (existTokens) dispatch.uiState.setActiveTab(Tabs.TOKENS);
+                    else dispatch.uiState.setActiveTab(Tabs.START);
                   } else {
                     dispatch.uiState.setActiveTab(Tabs.TOKENS);
                   }
